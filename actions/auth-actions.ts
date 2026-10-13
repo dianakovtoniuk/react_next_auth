@@ -2,11 +2,11 @@
 
 import { redirect } from 'next/navigation';
 
-import { hashUserPassword } from '@/lib/hash';
-import { createUser } from '@/lib/user';
-import { createAuthSession } from '@/lib/auth';
+import { hashUserPassword, verifyPassword } from '@/lib/hash';
+import { createUser, getUserByEmail } from '@/lib/user';
+import { createAuthSession, destroySession } from '@/lib/auth';
 
-interface SignupFormState {
+interface AuthFormState {
   errors?: {
     email?: string;
     password?: string;
@@ -14,13 +14,13 @@ interface SignupFormState {
 }
 
 export async function signup(
-  prevState: SignupFormState,
+  prevState: AuthFormState,
   formData: FormData
-): Promise<SignupFormState> {
+): Promise<AuthFormState> {
   const email = formData.get('email') as string;
   const password = formData.get('password') as string;
 
-  const errors: NonNullable<SignupFormState['errors']> = {};
+  const errors: NonNullable<AuthFormState['errors']> = {};
 
   if (!email.includes('@')) {
     errors.email = 'Please enter a valid email address.';
@@ -54,4 +54,51 @@ export async function signup(
     }
     throw error;
   }
+}
+
+export async function login(
+  prevState: AuthFormState,
+  formData: FormData
+): Promise<AuthFormState> {
+  const email = formData.get('email') as string;
+  const password = formData.get('password') as string;
+
+  const existingUser = getUserByEmail(email);
+
+  if (!existingUser) {
+    return {
+      errors: {
+        email: 'Could not authenticate user, please check your credentials.',
+      },
+    };
+  }
+
+  const isValidPassword = verifyPassword(existingUser.password, password);
+
+  if (!isValidPassword) {
+    return {
+      errors: {
+        password: 'Could not authenticate user, please check your credentials.',
+      },
+    };
+  }
+
+  await createAuthSession(String(existingUser.id));
+  redirect('/training');
+}
+
+export async function auth(
+  mode: string,
+  prevState: AuthFormState,
+  formData: FormData
+): Promise<AuthFormState> {
+  if (mode === 'login') {
+    return login(prevState, formData);
+  }
+  return signup(prevState, formData);
+}
+
+export async function logout(): Promise<void> {
+  await destroySession();
+  redirect('/');
 }
