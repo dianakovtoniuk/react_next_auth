@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 
 import { hashUserPassword } from '@/lib/hash';
 import { createUser } from '@/lib/user';
+import { createAuthSession } from '@/lib/auth';
 
 interface SignupFormState {
   errors?: {
@@ -35,7 +36,9 @@ export async function signup(
 
   const hashedPassword = hashUserPassword(password);
   try {
-    createUser(email, hashedPassword);
+    const id = createUser(email, hashedPassword);
+    await createAuthSession(String(id));
+    redirect('/training');
   } catch (error) {
     if (
       error instanceof Error &&
@@ -44,12 +47,11 @@ export async function signup(
     ) {
       return {
         errors: {
-          email: 'It seems like an account for the chosen email already exists.',
+          email:
+            'It seems like an account for the chosen email already exists.',
         },
       };
     }
     throw error;
   }
-
-  redirect('/training');
 }
